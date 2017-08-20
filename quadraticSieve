@@ -1,0 +1,156 @@
+/*
+This function contains given algorithm by lecturer.
+*/
+my_calPolynomial:= function(h,n);
+    _<x>:=PolynomialRing(Integers());
+    a:=h^2;
+    b:=Modsqrt(n,a); // a | b^2-n
+    bound:=53;
+    x0:=Floor(((Sqrt(n))-b)/a)+1;
+    counter:= 1;
+    relations:= [ ];
+    for i:=0 to 100 do
+        X:=Evaluate(a*x+b,x0+i);
+        S:=Evaluate(a*x^2+2*b*x+((b^2-n) div a),x0+i);
+        fac:=Factorization(S);
+        if fac[#fac][1] le bound then
+                relations[counter]:=[<x0+i, X, a, S, fac, (X^2-a*S) mod n eq 0>];
+                counter:= counter +1;
+        end if;
+    end for;
+    return relations;
+end function;
+
+/*
+This function returns indexes of prime values. 
+*/
+my_primetoIndex:= function(pArray)
+    pArraywithIndex:= [ ];
+    counter:=1;
+    A:= [];
+    for i in pArray do
+        for j in i do
+            A[counter]:=j[1];
+            counter+:=1;
+        end for;
+    end for;
+    A:=Sort(Setseq(Set(A)));
+    j:=1;
+    for i:=1 to #A do
+        pArraywithIndex[i]:=<j, A[i]>;
+        j+:=1;
+    end for;
+    return pArraywithIndex;
+end function;
+
+/*
+This funciton returns updated martix for given relation.
+*/
+update_Matrix:= function(M, pArraywithIndex, NumpArraywithIndex, NumallRelations, m, n, Value)
+    //print "Row=",m,", Colmn=",n,", Value=",Value;
+    a:=0;
+    for i in pArraywithIndex do
+        if n eq i[2] then
+        a:=i[1];
+        end if;
+    end for;
+    M:= Matrix(GF(2), NumpArraywithIndex, NumallRelations, [<m,a,Value>]);
+    return M;
+end function;
+
+/*
+this function returns calculated x,y values with given NS sequence. 
+*/
+my_matrix_solver:= function(allRelations , pArraywithIndex, ns)
+    ns:=Basis(ns);
+    print "\nNull space =",ns[1];
+    for i:=1 to #pArraywithIndex do
+        pArraywithIndex[i][1]:=0;
+    end for;
+    nthrelation:= [ ];
+    counter := 0;
+    ns:=ns[1];
+    for i:=1 to #pArraywithIndex do
+        if 1 eq ns[i] then
+            counter+:=1;
+            nthrelation[counter]:=i;
+        end if;
+    end for;
+    a:=[ ];
+    c:=[ ];
+    indexofa:=1;
+    for i in nthrelation do
+        for j in allRelations[i+1] do
+            for k in j[5] do
+                a[indexofa]:= (k[1]^k[2])*j[3];
+                c[indexofa]:= j[2]^2;  
+                 indexofa+:=1;     
+            end for;
+        end for;
+    end for;
+    b:=1;
+    e:=1;
+    for i:=1 to #a do
+        b*:=a[i];
+        e*:=c[i];
+    end for;
+    return b, e;
+end function;
+
+
+/*
+Main Function input n, output gcdof X+Y,X-Y with n.
+*/
+my_qsieve:=function(n)
+    print "n=",n;
+    allRelations:=[ ];
+    counterMain:=1;
+    h:=[13, 16, 17];
+    k:=1;
+    for i in h do
+        // Getting relations for given polynomial parameter.
+        relations:= my_calPolynomial(i,n);
+        l:=k;
+        for j:=1 to #relations do   
+            // combining relations and other parameters to one data structure.
+            allRelations[l]:=relations[j];
+            l+:=1;
+        end for;
+        k+:=#relations;
+    end for;
+    // sieving fonksiyonunu buraya yaz.
+    //B:=[2,11,13,17,23,29,37,53];
+    pArray:=[];    
+    for i:=1 to #allRelations do pArray[i]:=allRelations[i][1][5]; end for;
+    // indexed prime values using in functions to easy calculation.
+    pArraywithIndex:=my_primetoIndex(pArray);
+    // Big data structure to contain all information.
+    allRelations;
+
+    // With sieving function this part can be used in dynamic way.
+    M:= Matrix(GF(2), #pArraywithIndex, #allRelations, [] );
+    Nthrelation:=0;
+    for i in allRelations do
+        for j in i do
+            Nthrelation+:=1;
+            for k in j[5] do
+                if Nthrelation gt 1 then
+                    // updating matrix with founded relations.
+                    M+:=update_Matrix(M , pArraywithIndex, #pArraywithIndex, #allRelations, Nthrelation-1, k[1], k[2]);
+                end if;
+            end for;  
+        end for;
+    end for;
+    print "\nSpace Matrix=",M;
+    // this part is why all code cannot be using with other given "n" numbers. Because of the sieving function I cannot write this part dynamically.
+    W:=Matrix(GF(2), 1, 9, [ ]);
+    V,NS:=Solution(M,W);
+    o,p:=my_matrix_solver(allRelations, pArraywithIndex, NS);
+    X:=o mod n;
+    Y:=p mod n;  
+    
+    return GCD(X+Y,n), GCD(X-Y,n);
+end function;
+
+n:=1227953;
+my_qsieve(n);

@@ -1,0 +1,141 @@
+EllAdd:=function(x1,y1,z1,x2,y2,z2,a)
+	if z1 eq 0 then
+		return x2,y2,z2;
+	elif z2 eq 0 then
+		return x1,y1,z1;
+	else
+		if x1 eq x2 then
+			if y1 eq y2 then
+				if y1 eq 0 then
+					return 0,1,0;
+				else
+					x3:=((3*x1^2+a)/(2*y1))^2-2*x1;
+					y3:=((3*x1^2+a)/(2*y1))*(x1-x3)-y1;
+					return x3,y3,1;
+				end if;
+			else
+				return 0,1,0;
+			end if;
+		else
+			x3:=((y1-y2)/(x1-x2))^2-x1-x2;
+			y3:=((y1-y2)/(x1-x2))*(x1-x3)-y1;
+			return x3,y3,1;
+		end if;
+	end if;
+end function;
+
+EllScalarMul_dummy:=function(k,x1,y1,z1,a)
+    x3:=0; y3:=1; z3:=0;
+    for i:=1 to k do   
+        x3,y3,z3:=EllAdd(x1,y1,z1,x3,y3,z3,a);
+    end for;
+    return x3,y3,z3;
+end function;
+
+////////////////////////////////////////////////////
+////////////////H-O-M-E-W-O-R-K a//////////////////
+//////////////////////////////////////////////////
+EllScalarMul:=function(k,x1,y1,z1,a)
+    x3:=0; y3:=1; z3:=0;
+    kbin:= Reverse(IntegerToSequence(k,2));
+    for i:=1 to #kbin do   
+        if kbin[i] eq 0 then
+           x3,y3,z3:=EllAdd(x1,y1,z1,x3,y3,z3,a); 
+        end if;
+        x1,y1,z1:=EllScalarMul_dummy(2,x1,y1,z1,a); 
+    end for;
+    return x3,y3,z3;
+end function;
+////////////////////////////////////////////////////
+////////////////H-O-M-E-W-O-R-K a//////////////////
+//////////////////////////////////////////////////
+
+
+MY_ECC_add := function(E,a)
+    P:=Random(E); Q:=Random(E);
+    print ""; print "P=",P; print"Q=",Q;
+    x1:=P[1]; y1:=P[2]; z1:=P[3];
+    x2:=Q[1]; y2:=Q[2]; z2:=Q[3];
+
+    x3,y3,z3:=EllAdd(x1,y1,z1,x2,y2,z2,a);
+    return  "P+Q =",x3,y3,z3;
+end function;
+
+MY_ECC_ScalarMul:= function(P,a,k) //In lecture
+    x1:=P[1]; y1:=P[2]; z1:=P[3];
+    x3,y3,z3:=EllScalarMul(k,x1,y1,z1,a);
+    /////////// CHECK DUMMY MUL FUNCTION WHEN K IS LITTLE /////////////
+    //////////////////////////////////////////////////////////////////
+    //if k le 1000 then 
+    //    xT,yT,zT:=EllScalarMul_dummy(k,x1,y1,z1,a);
+    //    [xT,yT,zT] eq [x3,y3,z3];
+    //end if;
+    //////////////////////////////////////////////////////////////////
+    //////////////////////////////////////////////////////////////////
+    //print k,"*P =", x3,y3,z3;
+    return x3,y3,z3;
+end function;
+
+
+
+///////////////////////////////////////////////////
+////////////ELGAMAL PART//////////////////////////
+/////////////////////////////////////////////////
+EllElGamalEncrypt:=function(P, Q, a, M)
+    r:= Random([2..Order(P)-1]);
+    c01,c02,c03:=MY_ECC_ScalarMul(P,a,r);
+    C0 := [c01,c02,c03];
+    rq1,rq2,rq3:=MY_ECC_ScalarMul(Q,a,r);
+    rQ:=[rq1,rq2,rq3];
+    c11,c12,c13:= EllAdd(M[1],M[2],M[3],rQ[1],rQ[2],rQ[3],a);
+    C1:=[c11,c12,c13];
+    return C0,C1;
+end function;
+
+EllElGamalDecrypt:=function(k,C0,C1,a,E)
+    kc01,kc02,kc03:=MY_ECC_ScalarMul(C0,a,k);
+    kC0:=E![kc01,kc02,kc03];
+    M:= C1-kC0;
+    return M;
+end function;
+
+///////////////////////////////////////////////////
+////////////ELGAMAL PART//////////////////////////
+/////////////////////////////////////////////////
+
+My_ECC_Main:=function()
+    F:=FiniteField(NextPrime(Random(10000000000))); //or GF(19)
+    repeat
+        repeat
+            a:=Random(F);
+            b:=Random(F);
+        until 4*a^3+27*b^2 ne 0;
+        E:=EllipticCurve([a,b]);
+    until IsPrime(#E);
+    P:=Random(E);
+    //k:=12;
+    k:=Random([2..Order(P)-1]);
+
+    ////////HW-a/////////////////////
+   // MY_ECC_add(E,a);print "k*P=",MY_ECC_ScalarMul(P,a,k);print "";
+
+    ///////ELGAMAL//////////////////
+    print "Bob's public key";
+    q1,q2,q3:=MY_ECC_ScalarMul(P,a,k);
+    Q:=E![q1,q2,q3];
+    print "Q=",Q;
+    print "Bobs's private key";
+    print "k=",k;
+    print "Plain Text";
+    M:= Random(E);
+    print "M=", M;
+    ///// Encryption//////
+    C0,C1:=EllElGamalEncrypt(P,Q,a,M);
+    C1:=E!C1;
+    C0:=E!C0;
+    DecryptedText:=EllElGamalDecrypt(k,C0,C1,a,E);
+    print"DecryptedText=", DecryptedText;
+    return 1;
+end function;
+
+My_ECC_Main();
